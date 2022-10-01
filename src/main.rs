@@ -12,8 +12,12 @@ struct Handler;
 impl EventHandler for Handler {
     // For when the bot receives a message
     async fn message(&self, ctx: Context, msg: Message) {
-        if msg.content == "!ping" {
-            if let Err(why) = msg.channel_id.say(&ctx.http, "Pong!").await {
+        println!("I got a message. Replying to it");
+
+        let reply = "Your message was: ".to_owned() + &msg.content;
+
+        if msg.author.name == "Bourbon" {
+            if let Err(why) = msg.channel_id.say(&ctx.http, reply).await {
                 println!("Error sending message: {:?}", why);
             }
         }
