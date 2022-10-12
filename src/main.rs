@@ -1,10 +1,7 @@
-use std::collections::HashMap;
 use std::env;
 
 use reqwest::StatusCode;
-use serenity::{async_trait, json};
-use serenity::http::{Http, CacheHttp};
-use serenity::json::json;
+use serenity::async_trait;
 use serenity::model::gateway::Ready;
 use serenity::model::channel::Message;
 use serenity::model::id::{ChannelId, MessageId};
@@ -14,6 +11,12 @@ use serenity::Client;
 
 struct Handler;
 
+use serde::Serialize;
+
+#[derive(Serialize, Debug)]
+struct Messages {
+    messages: Vec<String>
+}
 
 // We'll consider the 
 // - Timestamp ==> [Date, Time]
@@ -69,29 +72,34 @@ impl EventHandler for Handler {
 async fn post_messages_to_server(ctx: Context, messages: Vec<Message>) {
     let request = reqwest::Client::new();
 
+    let channel_id: ChannelId = messages.get(0).unwrap().channel_id;
+
+    let server_messages: Vec<String> = messages.iter()
+        .map(|msg| msg.content.to_owned())
+        .collect();
+
     // TODO: Remove hardcoded IDs
-    let post = json!({
-        "id": 0 as usize,
-        "platform": "Discord",
-        "messages": messages,
-    });
+    let messages = Messages {
+        messages: server_messages,
+    };
 
+    // https://www.toptal.com/developers/postbin/1665594579058-8493777837138
+    // http://0.0.0.0:8080/message_from_discord
     let res = request.post("http://0.0.0.0:8080/message_from_discord")
-        .json(&post)
+        .body(serde_json::to_string(&messages).unwrap())
+        .header("Content-Type", "application/json")
         .send().await.unwrap();
-
-    dbg!(post);
+    
+    // dbg!(res.bytes);
 
     match res.status() {
         StatusCode::OK => {
-            messages.get(0).unwrap().
                 channel_id.say(ctx.http, "Posted your messages to Chronicles!")
                 .await.unwrap();
         },
         // TODO: Write more granular cases for failed requests.
         _ => {
-            messages.get(0).unwrap().channel_id.
-                say(ctx.http, format!("Post to Chronicles failed because: {}", res.text().await.unwrap()))
+            channel_id.say(ctx.http, format!("Post to Chronicles failed because: {}", res.text().await.unwrap()))
                 .await.unwrap();
         },
     }
