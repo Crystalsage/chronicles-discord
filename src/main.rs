@@ -1,6 +1,9 @@
 use std::env;
 
+use serde::Serialize;
+
 use reqwest::StatusCode;
+
 use serenity::async_trait;
 use serenity::model::gateway::Ready;
 use serenity::model::channel::Message;
@@ -8,15 +11,14 @@ use serenity::model::id::{ChannelId, MessageId};
 use serenity::prelude::*;
 use serenity::Client;
 
-
 struct Handler;
-
-use serde::Serialize;
 
 #[derive(Serialize, Debug)]
 struct Messages {
     messages: Vec<String>
 }
+
+static HOST: &'static str = "http://0.0.0.0:8080";
 
 // We'll consider the 
 // - Timestamp ==> [Date, Time]
@@ -31,12 +33,10 @@ impl EventHandler for Handler {
 
         println!("I got a message. Sending it to the server.");
 
-        let request = reqwest::Client::new();
-
         if msg.author.name == "Bourbon" {
             match msg.content.split(" ").nth(0).unwrap() {
                 "!ping" => { 
-                    msg.channel_id.say(ctx.http, "Pong!").await;
+                    msg.channel_id.say(ctx.http, "Pong!").await.unwrap();
                 },
 
                 "!post" => {
@@ -52,7 +52,6 @@ impl EventHandler for Handler {
 
                     let channel_id = msg.channel_id;
 
-                    // TODO: Get messages, make JSON and post them to the server
                     let messages: Vec<Message> = get_messages_by_id(&ctx, message_ids, channel_id).await.unwrap();
                     post_messages_to_server(ctx, messages).await;
                 },
@@ -83,9 +82,7 @@ async fn post_messages_to_server(ctx: Context, messages: Vec<Message>) {
         messages: server_messages,
     };
 
-    // https://www.toptal.com/developers/postbin/1665594579058-8493777837138
-    // http://0.0.0.0:8080/message_from_discord
-    let res = request.post("http://0.0.0.0:8080/message_from_discord")
+    let res = request.post(HOST.to_owned() + "/create_post")
         .body(serde_json::to_string(&messages).unwrap())
         .header("Content-Type", "application/json")
         .send().await.unwrap();
